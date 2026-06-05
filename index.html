@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>블랙야크 100대 명산 지도</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --forest: #2d5016;
+    --moss: #4a7c26;
+    --mist: #c8dfa0;
+    --stone: #8b9467;
+    --cream: #f5f0e8;
+    --gold: #c9a84c;
+    --snow: #ffffff;
+    --card-bg: rgba(245,240,232,0.98);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--ink);
+    color: var(--ink);
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh; /* dynamic viewport for mobile browsers */
+  }
+
+  /* ══════════════ HEADER ══════════════ */
+  header {
+    position: relative;
+    z-index: 1000;
+    background: var(--forest);
+    padding: 0 16px;
+    height: 56px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--gold);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+  .logo-icon {
+    width: 34px; height: 34px;
+    background: var(--gold);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .header-title {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--cream);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-sub {
+    font-size: 9px;
+    color: var(--mist);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+
+  .stat { text-align: center; color: var(--cream); }
+  .stat-num {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .stat-label { font-size: 9px; color: var(--mist); margin-top: 1px; white-space: nowrap; }
+
+  /* 모바일: 헤더 통계 숨김 */
+  @media (max-width: 480px) {
+    .header-stats { display: none; }
+    .header-title { font-size: 15px; }
+    .header-sub { display: none; }
+  }
+
+  /* ══════════════ MAP WRAP ══════════════ */
+  #map-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  #map { width: 100%; height: 100%; }
+
+  /* ══════════════ FILTER BAR ══════════════ */
+  #filter-bar {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 900;
+    display: flex;
+    gap: 6px;
+    background: rgba(26,26,46,0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 7px 10px;
+    border-radius: 40px;
+    border: 1px solid rgba(201,168,76,0.3);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    max-width: calc(100vw - 28px);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #filter-bar::-webkit-scrollbar { display: none; }
+
+  .filter-btn {
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--mist);
+    background: transparent;
+    white-space: nowrap;
+    -webkit-appearance: none;
+    /* 모바일 탭 영역 확보 */
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+  }
+  .filter-btn:hover, .filter-btn:active { color: var(--snow); border-color: rgba(201,168,76,0.5); }
+  .filter-btn.active { background: var(--gold); color: var(--ink); border-color: var(--gold); font-weight: 700; }
+
+  /* ══════════════ SEARCH ══════════════ */
+  #search-wrap {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 900;
+  }
+
+  #search-box {
+    background: rgba(26,26,46,0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 25px;
+    padding: 7px 14px;
+    color: var(--cream);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    width: 160px;
+    outline: none;
+    -webkit-appearance: none;
+    min-height: 36px;
+  }
+  #search-box::placeholder { color: var(--stone); }
+  #search-box:focus { border-color: var(--gold); }
+
+  @media (max-width: 480px) {
+    #search-wrap { display: none; } /* 모바일: 검색은 하단바로 이동 */
+  }
+
+  /* ══════════════ LEGEND ══════════════ */
+  #legend {
+    position: absolute;
+    bottom: 24px;
+    left: 12px;
+    z-index: 900;
+    background: rgba(26,26,46,0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--cream);
+    font-size: 11px;
+    min-width: 120px;
+  }
+  #legend h4 {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 11px;
+    color: var(--gold);
+    margin-bottom: 7px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+  .legend-dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 480px) {
+    #legend { display: none; } /* 모바일: 범례 숨김 (공간 절약) */
+  }
+
+  /* ══════════════ COUNT BADGE ══════════════ */
+  #count-badge {
+    position: absolute;
+    bottom: 24px;
+    right: 12px;
+    z-index: 900;
+    background: rgba(26,26,46,0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: var(--gold);
+    font-family: 'Noto Serif KR', serif;
+    font-size: 12px;
+    text-align: center;
+  }
+
+  @media (max-width: 480px) {
+    #count-badge { bottom: 130px; right: 10px; font-size: 11px; padding: 5px 10px; }
+  }
+
+  /* ══════════════ DESKTOP HOVER CARD ══════════════ */
+  #mountain-card {
+    position: fixed;
+    z-index: 9999;
+    width: 320px;
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.35), 0 0 0 1px rgba(201,168,76,0.3);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(6px) scale(0.97);
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    overflow: hidden;
+    font-size: 13px;
+  }
+  #mountain-card.visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+  }
+
+  /* 모바일: hover card 완전 비활성화 */
+  @media (max-width: 768px) {
+    #mountain-card { display: none !important; }
+  }
+
+  /* ══════════════ MOBILE BOTTOM SHEET ══════════════ */
+  #bottom-sheet {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 9000;
+    background: var(--card-bg);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.4);
+    border-top: 2px solid rgba(201,168,76,0.4);
+    transform: translateY(100%);
+    transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height: 75dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #bottom-sheet.open { transform: translateY(0); }
+
+  @media (max-width: 768px) {
+    #bottom-sheet { display: block; }
+  }
+
+  /* sheet 손잡이 */
+  .sheet-handle {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 12px 0 4px;
+    position: sticky;
+    top: 0;
+    background: var(--card-bg);
+    z-index: 1;
+  }
+  .sheet-handle-bar {
+    width: 40px; height: 4px;
+    background: rgba(0,0,0,0.15);
+    border-radius: 2px;
+  }
+
+  /* sheet 닫기 버튼 */
+  #sheet-close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.08);
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ink);
+    z-index: 2;
+  }
+
+  /* ══════════════ SHARED CARD CONTENT ══════════════ */
+  .card-header {
+    background: linear-gradient(135deg, var(--forest) 0%, var(--moss) 100%);
+    padding: 14px 16px 12px;
+    position: relative;
+  }
+  .card-number { font-size: 10px; color: var(--mist); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 2px; }
+  .card-name {
+    font-family: 'Noto Serif KR', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--snow);
+    line-height: 1.1;
+  }
+  .card-peak { font-size: 12px; color: var(--mist); margin-top: 2px; }
+  .card-height-badge {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: var(--gold);
+    color: var(--ink);
+    font-family: 'Noto Serif KR', serif;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 3px 10px;
+    border-radius: 20px;
+  }
+  .card-body { padding: 12px 16px 16px; }
+  .card-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 9px; }
+  .card-row:last-child { margin-bottom: 0; }
+  .card-icon { font-size: 14px; margin-top: 1px; flex-shrink: 0; width: 20px; text-align: center; }
+  .card-field-label { font-size: 10px; color: var(--stone); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 1px; }
+  .card-field-value { font-size: 13px; color: var(--ink); line-height: 1.45; }
+  .difficulty-badge {
+    display: inline-block; padding: 2px 9px; border-radius: 10px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.3px;
+  }
+  .diff-easy    { background: #d4edda; color: #155724; }
+  .diff-medium  { background: #fff3cd; color: #856404; }
+  .diff-hard    { background: #f8d7da; color: #721c24; }
+  .diff-extreme { background: #d1ecf1; color: #0c5460; }
+  .card-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(74,124,38,0.2), transparent); margin: 8px 0; }
+  .region-tag {
+    display: inline-block; background: var(--mist); color: var(--forest);
+    font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; margin-right: 4px;
+  }
+
+  /* ══════════════ MOBILE SEARCH BAR (bottom) ══════════════ */
+  #mobile-search-bar {
+    display: none;
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 900;
+    width: calc(100% - 90px);
+    max-width: 320px;
+  }
+  #mobile-search-input {
+    width: 100%;
+    background: rgba(26,26,46,0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 25px;
+    padding: 9px 18px;
+    color: var(--cream);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    outline: none;
+    -webkit-appearance: none;
+    min-height: 40px;
+  }
+  #mobile-search-input::placeholder { color: var(--stone); }
+  #mobile-search-input:focus { border-color: var(--gold); }
+
+  @media (max-width: 480px) {
+    #mobile-search-bar { display: block; }
+  }
+
+  /* ══════════════ LEAFLET ══════════════ */
+  .leaflet-container { background: #1a2535; }
+  .leaflet-popup-content-wrapper { display: none; }
+  .leaflet-control-zoom { margin-bottom: 8px !important; margin-right: 10px !important; }
+
+  @media (max-width: 480px) {
+    .leaflet-control-zoom { margin-bottom: 140px !important; }
+  }
+
+  /* ══════════════ OVERLAY (sheet 뒷배경) ══════════════ */
+  #sheet-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 8999;
+    background: rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  #sheet-overlay.show { opacity: 1; }
+  @media (max-width: 768px) {
+    #sheet-overlay { display: block; pointer-events: none; }
+    #sheet-overlay.show { pointer-events: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-icon">⛰️</div>
+    <div>
+      <div class="header-title">블랙야크 100대 명산</div>
+      <div class="header-sub">Black Yak 100 Famous Mountains of Korea</div>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="stat"><div class="stat-num">100</div><div class="stat-label">명산</div></div>
+    <div class="stat"><div class="stat-num">1,950m</div><div class="stat-label">최고봉 한라산</div></div>
+    <div class="stat"><div class="stat-num">327m</div><div class="stat-label">최저봉 팔봉산</div></div>
+  </div>
+</header>
+
+<div id="map-wrap">
+  <div id="map"></div>
+
+  <!-- 필터바 (공통) -->
+  <div id="filter-bar">
+    <button class="filter-btn active" data-region="전체">전체</button>
+    <button class="filter-btn" data-region="수도권">수도권</button>
+    <button class="filter-btn" data-region="강원">강원</button>
+    <button class="filter-btn" data-region="충청">충청</button>
+    <button class="filter-btn" data-region="경상">경상</button>
+    <button class="filter-btn" data-region="전라">전라</button>
+    <button class="filter-btn" data-region="제주">제주</button>
+  </div>
+
+  <!-- 데스크탑 검색 -->
+  <div id="search-wrap">
+    <input id="search-box" type="text" placeholder="🔍  산 이름 검색...">
+  </div>
+
+  <!-- 고도 범례 (데스크탑) -->
+  <div id="legend">
+    <h4>🏔 고도 범례</h4>
+    <div class="legend-item"><div class="legend-dot" style="background:#e8320a"></div><span>1500m 이상</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div><span>1000–1499m</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#eab308"></div><span>700–999m</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#84cc16"></div><span>700m 미만</span></div>
+  </div>
+
+  <!-- 카운트 뱃지 -->
+  <div id="count-badge">표시 <span id="visible-count">100</span>개</div>
+
+  <!-- 모바일 하단 검색 -->
+  <div id="mobile-search-bar">
+    <input id="mobile-search-input" type="search" placeholder="🔍 산 이름 검색..." autocomplete="off">
+  </div>
+</div>
+
+<!-- 데스크탑 호버 카드 -->
+<div id="mountain-card">
+  <div class="card-header">
+    <div class="card-number" id="c-number"></div>
+    <div class="card-name" id="c-name"></div>
+    <div class="card-peak" id="c-peak"></div>
+    <div class="card-height-badge" id="c-height"></div>
+  </div>
+  <div class="card-body">
+    <div class="card-row">
+      <div class="card-icon">📍</div>
+      <div><div class="card-field-label">위치</div><div class="card-field-value" id="c-location"></div></div>
+    </div>
+    <div class="card-divider"></div>
+    <div class="card-row">
+      <div class="card-icon">⚡</div>
+      <div><div class="card-field-label">난이도</div><div class="card-field-value" id="c-difficulty"></div></div>
+    </div>
+    <div class="card-row">
+      <div class="card-icon">🥾</div>
+      <div><div class="card-field-label">주요 등산 코스</div><div class="card-field-value" id="c-courses"></div></div>
+    </div>
+    <div class="card-row">
+      <div class="card-icon">⚡</div>
+      <div><div class="card-field-label">최단 코스</div><div class="card-field-value" id="c-short"></div></div>
+    </div>
+    <div class="card-divider"></div>
+    <div class="card-row">
+      <div class="card-icon">📖</div>
+      <div><div class="card-field-label">이름의 어원</div><div class="card-field-value" id="c-etymology"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 모바일 바텀 시트 -->
+<div id="sheet-overlay"></div>
+<div id="bottom-sheet">
+  <div class="sheet-handle">
+    <div class="sheet-handle-bar"></div>
+  </div>
+  <button id="sheet-close">✕</button>
+  <div class="card-header">
+    <div class="card-number" id="s-number"></div>
+    <div class="card-name" id="s-name"></div>
+    <div class="card-peak" id="s-peak"></div>
+    <div class="card-height-badge" id="s-height"></div>
+  </div>
+  <div class="card-body">
+    <div class="card-row">
+      <div class="card-icon">📍</div>
+      <div><div class="card-field-label">위치</div><div class="card-field-value" id="s-location"></div></div>
+    </div>
+    <div class="card-divider"></div>
+    <div class="card-row">
+      <div class="card-icon">⚡</div>
+      <div><div class="card-field-label">난이도</div><div class="card-field-value" id="s-difficulty"></div></div>
+    </div>
+    <div class="card-row">
+      <div class="card-icon">🥾</div>
+      <div><div class="card-field-label">주요 등산 코스</div><div class="card-field-value" id="s-courses"></div></div>
+    </div>
+    <div class="card-row">
+      <div class="card-icon">⚡</div>
+      <div><div class="card-field-label">최단 코스</div><div class="card-field-value" id="s-short"></div></div>
+    </div>
+    <div class="card-divider"></div>
+    <div class="card-row">
+      <div class="card-icon">📖</div>
+      <div><div class="card-field-label">이름의 어원</div><div class="card-field-value" id="s-etymology"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MOUNTAINS = [
+  { no:1,  name:"마니산", region:"수도권", loc:"인천 강화도", lat:37.468, lng:126.428, height:472, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"참성단 코스 (2.9km, 약 1시간 30분)|동문 코스 (4.2km, 약 2시간 30분)|계단 코스 (3.5km, 약 2시간)",
+    shortCourse:"참성단 코스 (2.9km, 1시간 30분)",
+    etymology:"'마니'는 산스크리트어로 보석·여의주를 뜻하며, 단군이 하늘에 제사를 지낸 신성한 산이라는 뜻을 담고 있다." },
+  { no:2,  name:"청계산", region:"수도권", loc:"서울 서초구", lat:37.416, lng:127.054, height:582, peak:"매봉",
+    difficulty:"하", diffClass:"diff-easy",
+    courses:"원터골 코스 (4.5km, 약 2시간)|청계사 코스 (5km, 약 2시간 30분)|옛골 코스 (3km, 약 1시간 30분)",
+    shortCourse:"옛골 코스 (3km, 1시간 30분)",
+    etymology:"맑고 깨끗한 계곡물이 흐르는 산이라 하여 '맑을 청(淸) + 계곡 계(溪)'로 청계산이라 불린다." },
+  { no:3,  name:"수락산", region:"수도권", loc:"서울 노원구", lat:37.672, lng:127.082, height:637, peak:"주봉",
+    difficulty:"하", diffClass:"diff-easy",
+    courses:"당고개 코스 (4km, 약 2시간)|학림사 코스 (5km, 약 2시간 30분)|철쭉 능선 코스 (6km, 약 3시간)",
+    shortCourse:"당고개 코스 (4km, 2시간)",
+    etymology:"산에서 물이 쏟아져 내린다 하여 '물 수(水) + 떨어질 락(落)'으로 수락산이라 불린다." },
+  { no:4,  name:"도봉산", region:"수도권", loc:"서울 강북구", lat:37.712, lng:127.020, height:730, peak:"신선대",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"도봉 탐방 지원센터 코스 (6km, 약 3시간)|망월사 코스 (5km, 약 2시간 30분)|원도봉 코스 (4km, 약 2시간)",
+    shortCourse:"원도봉 코스 (4km, 2시간)",
+    etymology:"'도(道)를 닦는 봉우리'라는 뜻으로 예로부터 수행처로 알려진 산이다." },
+  { no:5,  name:"북한산", region:"수도권", loc:"경기 고양", lat:37.659, lng:126.977, height:837, peak:"백운대",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"대서문 코스 (6.5km, 약 3시간 30분)|우이동 코스 (7km, 약 4시간)|북한산성 코스 (8km, 약 4시간 30분)",
+    shortCourse:"우이동→백운대 코스 (5km, 3시간)",
+    etymology:"한강의 북쪽에 있는 큰 산이라는 뜻으로, 삼국시대에는 부아악(負兒岳)이라 불리기도 했다." },
+  { no:6,  name:"명지산", region:"강원", loc:"경기 가평", lat:37.902, lng:127.402, height:1267, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"익근리 코스 (10km, 약 5시간)|명지계곡 코스 (8km, 약 4시간 30분)|아침고요 코스 (7km, 약 4시간)",
+    shortCourse:"명지계곡 코스 (8km, 4시간 30분)",
+    etymology:"'밝을 명(明) + 땅 지(地)'로, 밝고 넓은 지형을 가진 산이라는 의미." },
+  { no:7,  name:"연인산", region:"강원", loc:"경기 가평", lat:37.878, lng:127.479, height:1068, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"용추계곡 코스 (10km, 약 5시간)|우정의 길 코스 (7km, 약 3시간 30분)",
+    shortCourse:"우정의 길 코스 (7km, 3시간 30분)",
+    etymology:"연인들이 함께 오르기 좋다 하여 연인산이라 불린다. 봄 진달래와 철쭉이 아름다운 명소다." },
+  { no:8,  name:"유명산", region:"강원", loc:"경기 가평", lat:37.780, lng:127.536, height:862, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"유명산자연휴양림 코스 (8km, 약 4시간)|어비계곡 코스 (6km, 약 3시간)",
+    shortCourse:"어비계곡 코스 (6km, 3시간)",
+    etymology:"옛 지명인 '유명(幽明)'에서 왔으며 그윽하고 밝은 산이라는 뜻이다." },
+  { no:9,  name:"용문산", region:"강원", loc:"경기 양평", lat:37.547, lng:127.601, height:1157, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"용문사 코스 (9km, 약 4시간 30분)|삼거리 코스 (8km, 약 4시간)|신점리 코스 (10km, 약 5시간)",
+    shortCourse:"삼거리 코스 (8km, 4시간)",
+    etymology:"용이 살았다는 전설이 있는 계곡과 문 모양의 바위에서 유래하였으며, 천년 은행나무로도 유명하다." },
+  { no:10, name:"화악산", region:"강원", loc:"경기 가평", lat:37.973, lng:127.516, height:1423, peak:"중봉",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"화악리 코스 (12km, 약 6시간)|석룡산 연계 코스 (15km, 약 7시간)|삼회리 코스 (10km, 약 5시간)",
+    shortCourse:"삼회리 코스 (10km, 5시간)",
+    etymology:"'불꽃 화(火) + 산 악(嶽)'으로, 불꽃처럼 솟은 험준한 바위 봉우리들이 특징이다." },
+  { no:11, name:"소요산", region:"수도권", loc:"경기 동두천", lat:37.938, lng:127.073, height:587, peak:"의상대",
+    difficulty:"하중", diffClass:"diff-easy",
+    courses:"소요산역 코스 (6km, 약 3시간)|백운암 코스 (5km, 약 2시간 30분)",
+    shortCourse:"백운암 코스 (5km, 2시간 30분)",
+    etymology:"원효대사가 소요하며 유람하던 산이라 하여 소요산이라 불린다." },
+  { no:12, name:"관악산", region:"수도권", loc:"경기 과천", lat:37.445, lng:126.964, height:629, peak:"연주대",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"사당역 코스 (8km, 약 4시간)|과천향교 코스 (7km, 약 3시간 30분)|안양 코스 (9km, 약 4시간 30분)",
+    shortCourse:"과천향교 코스 (7km, 3시간 30분)",
+    etymology:"갓 모양의 바위가 있어 '갓 관(冠) + 산 악(岳)'으로 관악산이라 불린다." },
+  { no:13, name:"운악산", region:"수도권", loc:"경기 가평", lat:37.779, lng:127.258, height:937, peak:"동봉/서봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"현등사 코스 (7km, 약 4시간)|포천 코스 (8km, 약 4시간 30분)",
+    shortCourse:"현등사 코스 (7km, 4시간)",
+    etymology:"구름 속에 우뚝 솟은 큰 산이라는 뜻. 경기의 금강이라 불릴 만큼 기암이 많다." },
+  { no:14, name:"감악산", region:"수도권", loc:"경기 파주", lat:37.890, lng:126.866, height:675, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"설마리 코스 (7km, 약 3시간 30분)|임진강변 코스 (9km, 약 4시간 30분)",
+    shortCourse:"설마리 코스 (7km, 3시간 30분)",
+    etymology:"신라 오악 중 하나로 신성시 되었으며, '감'은 신령스러운 산을 뜻하는 고유어다." },
+  { no:15, name:"명성산", region:"수도권", loc:"경기 포천", lat:38.063, lng:127.359, height:923, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"산정호수 코스 (10km, 약 5시간)|자인사 코스 (8km, 약 4시간)",
+    shortCourse:"자인사 코스 (8km, 4시간)",
+    etymology:"왕건에게 패한 궁예가 이 산에서 통곡했다는 전설에서 명성산(鳴聲山)이라 불린다." },
+  { no:16, name:"가리산", region:"강원", loc:"강원 홍천", lat:37.809, lng:127.985, height:1051, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"덕치리 코스 (9km, 약 4시간 30분)|가리산리 코스 (7km, 약 4시간)",
+    shortCourse:"가리산리 코스 (7km, 4시간)",
+    etymology:"산봉우리가 낫처럼 생겼다 하여 '낫 가리'에서 유래했다는 설이 있다." },
+  { no:17, name:"계방산", region:"강원", loc:"강원 평창", lat:37.658, lng:128.468, height:1577, peak:"정상",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"운두령 코스 (6km, 약 3시간 30분)|이목정 코스 (12km, 약 6시간)|방아다리 코스 (14km, 약 7시간)",
+    shortCourse:"운두령 코스 (6km, 3시간 30분)",
+    etymology:"산세가 닭의 꽁지깃처럼 뻗어 있다는 뜻. 한국에서 5번째로 높은 산이다." },
+  { no:18, name:"오대산(노인봉)", region:"강원", loc:"강원 강릉", lat:37.796, lng:128.571, height:1338, peak:"노인봉",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"소금강 코스 (16km, 약 8시간)|연곡 코스 (12km, 약 6시간)",
+    shortCourse:"연곡 코스 (12km, 6시간)",
+    etymology:"바위 형상이 노인을 닮았다 하여 노인봉이라 불린다. 소금강 일대의 험준한 봉우리다." },
+  { no:19, name:"오대산(비로봉)", region:"강원", loc:"강원 강릉", lat:37.793, lng:128.543, height:1563, peak:"비로봉",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"월정사 코스 (15km, 약 7시간)|상원사 코스 (8km, 약 4시간)|진고개 코스 (10km, 약 5시간)",
+    shortCourse:"상원사 코스 (8km, 4시간)",
+    etymology:"다섯 봉우리의 오대산(五臺山). 비로봉(毘盧峰)은 비로자나 부처님을 모시는 봉우리라는 뜻이다." },
+  { no:20, name:"두타산", region:"강원", loc:"강원 동해", lat:37.390, lng:129.077, height:1353, peak:"정상",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"댓재 코스 (12km, 약 6시간)|삼화사 코스 (15km, 약 8시간)|청옥산 연계 (18km, 약 9시간)",
+    shortCourse:"댓재 코스 (12km, 6시간)",
+    etymology:"'두타(頭陀)'는 불교 수행법의 하나로 고행을 뜻하며, 예로부터 수행 승려들이 즐겨 찾던 산이다." },
+  { no:21, name:"방태산", region:"강원", loc:"강원 인제", lat:38.013, lng:128.351, height:1444, peak:"주억봉",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"방동약수 코스 (12km, 약 6시간)|개인약수 코스 (15km, 약 7시간 30분)",
+    shortCourse:"방동약수 코스 (12km, 6시간)",
+    etymology:"'방태(芳台)'는 향기로운 대지라는 뜻으로, 울창한 원시림과 맑은 계곡이 어우러진다." },
+  { no:22, name:"백덕산", region:"강원", loc:"강원 영월", lat:37.288, lng:128.148, height:1350, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"사자산 코스 (14km, 약 7시간)|법흥사 코스 (10km, 약 5시간)",
+    shortCourse:"법흥사 코스 (10km, 5시간)",
+    etymology:"온갖 덕을 갖추었다는 의미로, 넓고 완만한 산세와 풍부한 산림 자원에서 비롯된 이름이다." },
+  { no:23, name:"백운산(동강)", region:"강원", loc:"강원 정선", lat:37.283, lng:128.780, height:882, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"용탄리 코스 (10km, 약 5시간)|남한강 코스 (8km, 약 4시간)",
+    shortCourse:"남한강 코스 (8km, 4시간)",
+    etymology:"흰 구름이 항상 산을 감싸고 있어 백운산(白雲山)이라 불린다. 동강 주변의 아름다운 경관으로 유명." },
+  { no:24, name:"설악산", region:"강원", loc:"강원 인제", lat:38.120, lng:128.465, height:1708, peak:"대청봉",
+    difficulty:"최상", diffClass:"diff-extreme",
+    courses:"오색 코스 (7.5km, 약 5시간)|소공원 코스 (13km, 약 7시간)|백담사 코스 (25km, 약 12시간)",
+    shortCourse:"오색 코스 (7.5km, 5시간)",
+    etymology:"눈이 내리면 산 전체가 하얗게 덮여 '눈 설(雪) + 산 악(嶽)'. 한국 제2의 고봉, 국립공원." },
+  { no:25, name:"응봉산", region:"강원", loc:"강원 삼척", lat:37.228, lng:129.170, height:998, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"덕풍계곡 코스 (12km, 약 6시간)|응봉리 코스 (8km, 약 4시간 30분)",
+    shortCourse:"응봉리 코스 (8km, 4시간 30분)",
+    etymology:"매가 날아오르는 형상의 봉우리라는 뜻. 덕풍계곡의 웅장한 협곡으로 유명하다." },
+  { no:26, name:"치악산", region:"강원", loc:"강원 원주", lat:37.383, lng:128.079, height:1288, peak:"비로봉",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"구룡사 코스 (9km, 약 5시간)|성남리 코스 (12km, 약 6시간)|부곡리 코스 (10km, 약 5시간 30분)",
+    shortCourse:"구룡사 코스 (9km, 5시간)",
+    etymology:"예로부터 꿩이 많이 서식하여 '꿩 치(雉) + 산 악(岳)'이라 불렸다. 구룡사와 세렴폭포로 유명." },
+  { no:27, name:"태백산", region:"강원", loc:"강원 정선", lat:37.099, lng:128.916, height:1567, peak:"천제단/장군봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"당골 코스 (4km, 약 2시간 30분)|유일사 코스 (6km, 약 3시간)|문수봉 코스 (10km, 약 5시간)",
+    shortCourse:"당골 코스 (4km, 2시간 30분)",
+    etymology:"'크고 밝은 산'이라는 뜻의 순우리말에서 태백(太白)으로 표기. 단군신화의 성산이다." },
+  { no:28, name:"함백산", region:"강원", loc:"강원 태백", lat:37.152, lng:128.982, height:1573, peak:"정상",
+    difficulty:"하중", diffClass:"diff-easy",
+    courses:"두문동재 코스 (4km, 약 2시간)|만항재 코스 (5km, 약 2시간 30분)",
+    shortCourse:"두문동재 코스 (4km, 2시간)",
+    etymology:"'크고 넓다'는 뜻의 '한'에서 함백(咸白)으로 표기. 도로로 1300m까지 접근 가능한 고산." },
+  { no:29, name:"태화산", region:"강원", loc:"강원 영월", lat:37.135, lng:128.472, height:1027, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"법흥사 코스 (9km, 약 4시간 30분)|영월 코스 (10km, 약 5시간)",
+    shortCourse:"법흥사 코스 (9km, 4시간 30분)",
+    etymology:"'크고 넓게 빛난다'는 뜻의 태화(太華). 법흥사와 흥녕선원이 있는 불교 성지다." },
+  { no:30, name:"가리왕산", region:"강원", loc:"강원 정선", lat:37.449, lng:128.601, height:1561, peak:"정상",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"회동 코스 (12km, 약 6시간)|장구목이 코스 (8km, 약 4시간 30분)|중봉 코스 (14km, 약 7시간)",
+    shortCourse:"장구목이 코스 (8km, 4시간 30분)",
+    etymology:"마한의 왕 이름에서 유래한다는 설이 있으며, 원시림이 잘 보존된 강원의 명산이다." },
+  { no:31, name:"감악산(원주)", region:"강원", loc:"강원 원주", lat:37.352, lng:127.988, height:930, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"비두리 코스 (8km, 약 4시간)|청련사 코스 (7km, 약 3시간 30분)",
+    shortCourse:"청련사 코스 (7km, 3시간 30분)",
+    etymology:"신령스러운 산이라는 뜻의 고유어 '감'에서 유래했다. 원주 시내에서 바라보이는 랜드마크 산." },
+  { no:32, name:"덕항산", region:"강원", loc:"강원 삼척", lat:37.216, lng:129.090, height:1071, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"환선굴 코스 (8km, 약 4시간)|대이리 코스 (10km, 약 5시간)",
+    shortCourse:"환선굴 코스 (8km, 4시간)",
+    etymology:"'덕스러운 고개'라는 뜻의 덕항(德項). 세계적 규모의 환선굴이 이 산 중턱에 위치한다." },
+  { no:33, name:"삼악산", region:"강원", loc:"강원 춘천", lat:37.861, lng:127.658, height:654, peak:"용화봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"등선폭포 코스 (5km, 약 3시간)|의암 코스 (6km, 약 3시간 30분)",
+    shortCourse:"등선폭포 코스 (5km, 3시간)",
+    etymology:"세 개의 봉우리가 있어 삼악산(三岳山). 의암호와 어우러진 경관이 빼어나다." },
+  { no:34, name:"용화산", region:"강원", loc:"강원 화천", lat:38.076, lng:127.695, height:878, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"천장리 코스 (9km, 약 4시간 30분)|파로호 코스 (8km, 약 4시간)",
+    shortCourse:"파로호 코스 (8km, 4시간)",
+    etymology:"용이 살았다는 전설과 '용(龍) + 꽃 화(花)'의 조합. 화천 파로호를 내려다보는 아름다운 산." },
+  { no:35, name:"오봉산", region:"강원", loc:"강원 춘천", lat:37.821, lng:127.707, height:779, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"청평사 코스 (6km, 약 3시간)|배후령 코스 (8km, 약 4시간)",
+    shortCourse:"청평사 코스 (6km, 3시간)",
+    etymology:"다섯 봉우리가 솟아 있어 오봉산(五峰山). 소양호와 어우러진 풍광이 아름답다." },
+  { no:36, name:"팔봉산", region:"강원", loc:"강원 홍천", lat:37.753, lng:127.800, height:327, peak:"2봉",
+    difficulty:"하중", diffClass:"diff-easy",
+    courses:"팔봉산 코스 (3km, 약 2시간)|전코스 종주 (5km, 약 3시간 30분)",
+    shortCourse:"팔봉산 코스 (3km, 2시간)",
+    etymology:"여덟 개의 봉우리가 차례로 늘어서 있어 팔봉산(八峰山). 낮지만 암릉이 발달해 재미있는 산행지." },
+  { no:37, name:"가야산", region:"경상", loc:"경남 합천", lat:35.821, lng:128.108, height:1430, peak:"우두봉",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"성주 코스 (9km, 약 5시간)|해인사 코스 (12km, 약 6시간)|백운동 코스 (10km, 약 5시간 30분)",
+    shortCourse:"성주 코스 (9km, 5시간)",
+    etymology:"가야국의 이름에서 비롯되었으며, 소의 머리 형상의 우두봉과 해인사 팔만대장경으로 유명하다." },
+  { no:38, name:"가지산", region:"경상", loc:"경남 영남알프스", lat:35.617, lng:128.988, height:1240, peak:"정상",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"석남사 코스 (10km, 약 5시간)|중봉 코스 (12km, 약 6시간)|쌀바위 코스 (8km, 약 4시간 30분)",
+    shortCourse:"쌀바위 코스 (8km, 4시간 30분)",
+    etymology:"신라 화랑들이 수련하던 곳으로 '지혜를 더하는' 산이라는 의미. 영남알프스의 최고봉이다." },
+  { no:39, name:"재약산", region:"경상", loc:"경남 영남알프스", lat:35.534, lng:128.985, height:1189, peak:"수미봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"표충사 코스 (8km, 약 4시간)|천황산 연계 (15km, 약 7시간)|오천평반석 코스 (9km, 약 4시간 30분)",
+    shortCourse:"표충사 코스 (8km, 4시간)",
+    etymology:"'약초를 가득 싣고 있다'는 뜻의 재약(載藥). 이 산에서 나는 약초가 풍부하다는 데서 유래했다." },
+  { no:40, name:"신불산", region:"경상", loc:"경남 영남알프스", lat:35.570, lng:129.035, height:1209, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"배내고개 코스 (8km, 약 4시간)|등억알프스 코스 (10km, 약 5시간)",
+    shortCourse:"배내고개 코스 (8km, 4시간)",
+    etymology:"'신불(神佛)'은 신과 부처를 뜻하며, 신성한 자연을 표현한다. 가을 억새 군락지로 전국적으로 유명하다." },
+  { no:41, name:"천성산", region:"경상", loc:"경남 양산", lat:35.413, lng:129.135, height:812, peak:"1봉/2봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"내원사 코스 (8km, 약 4시간)|안적사 코스 (7km, 약 3시간 30분)|원효암 코스 (6km, 약 3시간)",
+    shortCourse:"원효암 코스 (6km, 3시간)",
+    etymology:"원효대사가 천 명의 승려를 교화했다는 전설에서 천성산(千聖山)이라 불린다." },
+  { no:42, name:"황매산", region:"경상", loc:"경남 산청", lat:35.517, lng:127.954, height:1108, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"모산재 코스 (8km, 약 4시간)|합천 코스 (10km, 약 5시간)|영암사지 코스 (7km, 약 3시간 30분)",
+    shortCourse:"영암사지 코스 (7km, 3시간 30분)",
+    etymology:"'노란 매화가 피는 산'이라는 뜻. 봄 철쭉이 가득 피어 '철쭉산'이라고도 불린다." },
+  { no:43, name:"황석산", region:"경상", loc:"경남 함양", lat:35.538, lng:127.834, height:1192, peak:"정상",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"거망산 코스 (12km, 약 6시간)|안의 코스 (8km, 약 4시간 30분)",
+    shortCourse:"안의 코스 (8km, 4시간 30분)",
+    etymology:"산의 암석이 황갈색을 띠는 데서 황석(黃石)이라 유래했다. 거망산과 함께 종주 코스가 인기다." },
+  { no:44, name:"화왕산", region:"경상", loc:"경남 창녕", lat:35.543, lng:128.598, height:756, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"자하곡 코스 (5km, 약 2시간 30분)|관룡산 연계 (10km, 약 5시간)",
+    shortCourse:"자하곡 코스 (5km, 2시간 30분)",
+    etymology:"정상부의 광활한 억새밭이 장관을 이루며, 임진왜란 당시 의병 활동의 거점이었다." },
+  { no:45, name:"대야산", region:"경상", loc:"경북 문경", lat:36.674, lng:128.042, height:930, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"밀재 코스 (6km, 약 3시간)|선유동계곡 코스 (8km, 약 4시간)",
+    shortCourse:"밀재 코스 (6km, 3시간)",
+    etymology:"'큰 들판'이라는 뜻의 대야(大野). 월영대·용추폭포가 있는 선유동계곡이 유명하다." },
+  { no:46, name:"청화산", region:"경상", loc:"경북 문경", lat:36.697, lng:128.095, height:970, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"조항리 코스 (8km, 약 4시간)|쌍룡계곡 코스 (7km, 약 3시간 30분)",
+    shortCourse:"쌍룡계곡 코스 (7km, 3시간 30분)",
+    etymology:"'맑고 아름다운 산'이라는 뜻으로 청화(淸華). 대야산과 함께 종주 산행이 인기다." },
+  { no:47, name:"금정산", region:"경상", loc:"경남 양산", lat:35.285, lng:129.056, height:801, peak:"고당봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"범어사 코스 (8km, 약 4시간)|동문 코스 (10km, 약 5시간)|산성마을 코스 (7km, 약 3시간 30분)",
+    shortCourse:"산성마을 코스 (7km, 3시간 30분)",
+    etymology:"산 정상에 금색 물고기가 사는 우물이 있다는 전설. 우리나라 최대 규모의 산성이 있다." },
+  { no:48, name:"내연산", region:"경상", loc:"경북 포항", lat:36.198, lng:129.265, height:711, peak:"삼지봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"보경사 12폭포 코스 (8km, 약 4시간)|향로봉 코스 (10km, 약 5시간)",
+    shortCourse:"보경사 12폭포 코스 (8km, 4시간)",
+    etymology:"'안에서 불타는 연기가 피어오른다'는 전설에서 내연산이라 불린다. 12폭포 계곡으로 유명." },
+  { no:49, name:"소백산", region:"경상", loc:"경북 영주", lat:36.944, lng:128.487, height:1439, peak:"비로봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"희방사 코스 (8km, 약 4시간 30분)|어의곡 코스 (10km, 약 5시간)|죽령 코스 (11km, 약 5시간 30분)",
+    shortCourse:"희방사 코스 (8km, 4시간 30분)",
+    etymology:"'작은 백두산'이라는 뜻으로, 백두대간의 주요 산줄기에 위치한다. 봄 철쭉과 겨울 눈꽃이 환상적이다." },
+  { no:50, name:"조령산", region:"경상", loc:"경북 문경", lat:36.749, lng:128.009, height:1026, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"문경새재 코스 (10km, 약 5시간)|신북 코스 (8km, 약 4시간 30분)",
+    shortCourse:"신북 코스 (8km, 4시간 30분)",
+    etymology:"새도 날아서 넘기 힘든 고갯마루를 뜻하는 새재(조령, 鳥嶺). 문경새재가 유명하다." },
+  { no:51, name:"주흘산", region:"경상", loc:"경북 문경", lat:36.774, lng:128.028, height:1106, peak:"영봉/주봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"문경새재 코스 (10km, 약 5시간)|혜국사 코스 (8km, 약 4시간 30분)",
+    shortCourse:"혜국사 코스 (8km, 4시간 30분)",
+    etymology:"문경의 주산(主山)이자 우뚝 솟은 산이라는 의미. 문경새재 제3관문이 이 산 아래에 있다." },
+  { no:52, name:"주왕산", region:"경상", loc:"경북 청송", lat:36.387, lng:129.175, height:722, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"대전사 코스 (주왕계곡, 6km, 약 3시간)|가메봉 코스 (10km, 약 5시간)|절골 코스 (8km, 약 4시간)",
+    shortCourse:"주왕계곡 코스 (6km, 3시간)",
+    etymology:"당나라 주왕(周王)이 이 산에 숨었다는 전설에서 유래. 기암절벽과 계곡이 어우러진 국립공원이다." },
+  { no:53, name:"선달산", region:"경상", loc:"경북 봉화", lat:37.104, lng:128.867, height:870, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"도래기재 코스 (8km, 약 4시간)|비동리 코스 (7km, 약 3시간 30분)",
+    shortCourse:"비동리 코스 (7km, 3시간 30분)",
+    etymology:"선달(仙達)은 '신선이 도달한 곳'이라는 의미로, 깊은 산중의 아름다운 자연이 신선의 세계를 연상시킨다." },
+  { no:54, name:"황악산", region:"경상", loc:"경북 김천", lat:36.121, lng:127.929, height:1111, peak:"비로봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"직지사 코스 (9km, 약 4시간 30분)|운수암 코스 (7km, 약 4시간)",
+    shortCourse:"운수암 코스 (7km, 4시간)",
+    etymology:"가을 단풍이 황금빛으로 물드는 황악(黃岳). 직지사가 이 산 아래에 있다." },
+  { no:55, name:"칠보산", region:"경상", loc:"경북 괴산", lat:36.800, lng:127.987, height:778, peak:"속리산",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"쌍곡계곡 코스 (7km, 약 3시간 30분)|선유동 코스 (6km, 약 3시간)",
+    shortCourse:"선유동 코스 (6km, 3시간)",
+    etymology:"일곱 가지 보물이 숨겨진 산이라는 전설에서 칠보(七寶)라는 이름이 유래했다." },
+  { no:56, name:"금오산", region:"경상", loc:"경북 구미", lat:36.116, lng:128.344, height:976, peak:"현월봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"도선굴 코스 (9km, 약 4시간 30분)|해운사 코스 (8km, 약 4시간)",
+    shortCourse:"해운사 코스 (8km, 4시간)",
+    etymology:"'황금 자라'를 닮았다 하여 금오산(金鰲山). 야은 길재가 은거한 도선굴이 있다." },
+  { no:57, name:"팔공산", region:"경상", loc:"경북 군위", lat:35.991, lng:128.694, height:1193, peak:"비로봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"동화사 코스 (10km, 약 5시간)|파계사 코스 (9km, 약 4시간 30분)|갓바위 코스 (6km, 약 3시간)",
+    shortCourse:"갓바위 코스 (6km, 3시간)",
+    etymology:"왕건의 전투에서 8명의 장수가 전사했다 하여 팔공산(八公山). 갓바위 약사여래불이 유명하다." },
+  { no:58, name:"남산(경주)", region:"경상", loc:"경북 경주", lat:35.779, lng:129.208, height:468, peak:"금오봉",
+    difficulty:"하중", diffClass:"diff-easy",
+    courses:"삼릉 코스 (7km, 약 3시간 30분)|통일전 코스 (8km, 약 4시간)|창림사지 코스 (6km, 약 3시간)",
+    shortCourse:"창림사지 코스 (6km, 3시간)",
+    etymology:"경주 도성 남쪽의 산으로, 신라 역사와 문화가 담겨있다. 수많은 불상과 석탑이 산재한다." },
+  { no:59, name:"비슬산", region:"경상", loc:"대구", lat:35.684, lng:128.538, height:1083, peak:"천왕봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"유가사 코스 (9km, 약 4시간 30분)|용연사 코스 (10km, 약 5시간)|도성암 코스 (7km, 약 3시간 30분)",
+    shortCourse:"도성암 코스 (7km, 3시간 30분)",
+    etymology:"산의 모양이 거문고(琵)와 비파(瑟)를 닮았다 하여 비슬산. 봄 진달래 군락지로 전국적으로 유명하다." },
+  { no:60, name:"덕룡산", region:"전라", loc:"전남 강진", lat:34.594, lng:126.794, height:432, peak:"동봉/서봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"수리봉 코스 (8km, 약 4시간)|쌍계사 코스 (7km, 약 3시간 30분)",
+    shortCourse:"쌍계사 코스 (7km, 3시간 30분)",
+    etymology:"'덕스러운 용이 사는 산'. 암릉이 날카롭고 기암괴석이 많아 실제보다 훨씬 험준하게 느껴지는 산이다." },
+  { no:61, name:"동악산", region:"전라", loc:"전남 곡성", lat:35.278, lng:127.269, height:735, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"도림사 코스 (7km, 약 3시간 30분)|성륜사 코스 (8km, 약 4시간)",
+    shortCourse:"도림사 코스 (7km, 3시간 30분)",
+    etymology:"'동쪽의 큰 산악'이라는 뜻. 도림사를 품고 있는 곡성의 진산이다. 계곡과 폭포가 아름답다." },
+  { no:62, name:"무등산", region:"전라", loc:"전남 화순", lat:35.124, lng:127.001, height:1100, peak:"서석대",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"원효사 코스 (8km, 약 4시간)|증심사 코스 (10km, 약 5시간)|너릿재 코스 (9km, 약 4시간 30분)",
+    shortCourse:"원효사 코스 (8km, 4시간)",
+    etymology:"'등급을 매길 수 없는(無等) 산'. 광주의 진산으로 주상절리 서석대가 유명하다." },
+  { no:63, name:"방장산", region:"전라", loc:"전남 장성", lat:35.453, lng:126.764, height:743, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"백양사 코스 (8km, 약 4시간)|방장 코스 (6km, 약 3시간)",
+    shortCourse:"방장 코스 (6km, 3시간)",
+    etymology:"'방장(方丈)'은 불교에서 주지스님의 거처를 뜻하며, 예로부터 불교의 성지로 여겨진 데서 유래했다." },
+  { no:64, name:"백운산(광양)", region:"전라", loc:"전남 광양", lat:35.102, lng:127.608, height:1228, peak:"상봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"진틀 코스 (10km, 약 5시간)|성불사 코스 (9km, 약 4시간 30분)|옥룡사 코스 (8km, 약 4시간)",
+    shortCourse:"옥룡사 코스 (8km, 4시간)",
+    etymology:"흰 구름이 항상 산을 감싸고 있어 백운산(白雲山). 봄 광양 매화마을과 인접한 명산이다." },
+  { no:65, name:"불갑산", region:"전라", loc:"전남 영광", lat:35.160, lng:126.461, height:516, peak:"연실봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"불갑사 코스 (6km, 약 3시간)|연실봉 코스 (8km, 약 4시간)",
+    shortCourse:"불갑사 코스 (6km, 3시간)",
+    etymology:"'부처님이 처음 오신 곳'이라는 뜻의 불갑(佛甲). 백제 최초의 불교 사원 불갑사가 있다." },
+  { no:66, name:"월출산", region:"전라", loc:"전남 영암", lat:34.745, lng:126.693, height:809, peak:"천황봉",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"천황사 코스 (6km, 약 4시간)|도갑사 코스 (8km, 약 5시간)|구름다리 코스 (5km, 약 3시간)",
+    shortCourse:"구름다리 코스 (5km, 3시간)",
+    etymology:"달이 뜨는 산이라 하여 월출산(月出山). 기암절벽과 국내 최장 현수교(구름다리)로 유명하다." },
+  { no:67, name:"조계산", region:"전라", loc:"전남 순천", lat:35.007, lng:127.287, height:884, peak:"장군봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"선암사 코스 (8km, 약 4시간)|송광사 코스 (9km, 약 4시간 30분)|굴목재 종주 (13km, 약 6시간)",
+    shortCourse:"선암사 코스 (8km, 4시간)",
+    etymology:"중국 선종의 발상지 조계산에서 이름을 따왔다. 한국 불교의 성지 송광사와 선암사를 품고 있다." },
+  { no:68, name:"천관산", region:"전라", loc:"전남 장흥", lat:34.555, lng:127.048, height:723, peak:"연대봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"탑산사 코스 (5km, 약 3시간)|천관사 코스 (7km, 약 3시간 30분)|능선 종주 (10km, 약 5시간)",
+    shortCourse:"탑산사 코스 (5km, 3시간)",
+    etymology:"산 모양이 왕관(天冠)을 닮았다 하여 천관산. 기암괴석과 억새가 어우러진 경관이 장관이다." },
+  { no:69, name:"축령산(장성)", region:"전라", loc:"전남 장성", lat:35.302, lng:126.770, height:621, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"추암리 코스 (7km, 약 3시간 30분)|금곡리 코스 (6km, 약 3시간)",
+    shortCourse:"금곡리 코스 (6km, 3시간)",
+    etymology:"'하늘을 받드는 산'이라는 뜻의 축령(祝嶺). 편백나무 숲이 울창하여 힐링 산행지로 인기가 높다." },
+  { no:70, name:"팔영산", region:"전라", loc:"전남 고흥", lat:34.520, lng:127.468, height:608, peak:"깃대봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"능가사 코스 (8km, 약 5시간)|팔영산 코스 (6km, 약 4시간)",
+    shortCourse:"팔영산 코스 (6km, 4시간)",
+    etymology:"여덟 봉우리의 그림자가 바다에 비친다는 데서 팔영산(八影山)이라 유래했다." },
+  { no:71, name:"반야봉(지리산)", region:"전라", loc:"전남 지리산", lat:35.322, lng:127.521, height:1732, peak:"정상",
+    difficulty:"최상", diffClass:"diff-extreme",
+    courses:"성삼재 코스 (10km, 약 5시간 30분)|뱀사골 코스 (15km, 약 8시간)",
+    shortCourse:"성삼재 코스 (10km, 5시간 30분)",
+    etymology:"반야(般若)는 불교에서 최고의 지혜를 의미. 지리산 제2봉으로 운해와 일몰이 장관이다." },
+  { no:72, name:"지리산", region:"전라", loc:"전남 지리산", lat:35.337, lng:127.731, height:1915, peak:"천왕봉",
+    difficulty:"최상", diffClass:"diff-extreme",
+    courses:"중산리 코스 (9km, 약 6시간)|백무동 코스 (14km, 약 8시간)|화엄사 코스 (13km, 약 7시간 30분)",
+    shortCourse:"중산리 코스 (9km, 6시간)",
+    etymology:"지혜롭고 어리석은 사람도 머물면 지혜로워진다 하여 지이(智異)가 지리(智異)가 되었다. 본토 최고봉." },
+  { no:73, name:"달마산", region:"전라", loc:"전남 해남", lat:34.448, lng:126.560, height:489, peak:"달마봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"미황사 코스 (8km, 약 4시간)|도솔암 코스 (6km, 약 3시간 30분)",
+    shortCourse:"도솔암 코스 (6km, 3시간 30분)",
+    etymology:"달마대사(達磨大師)의 이름을 딴 산. 해남 땅끝마을 인근에 위치하며 미황사와 도솔암이 유명하다." },
+  { no:74, name:"두륜산", region:"전라", loc:"전남 해남", lat:34.516, lng:126.607, height:703, peak:"가련봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"대흥사 코스 (9km, 약 4시간 30분)|오소재 코스 (7km, 약 3시간 30분)",
+    shortCourse:"오소재 코스 (7km, 3시간 30분)",
+    etymology:"산등성이가 두루 고리처럼 연결된 형상을 표현한 두륜(頭輪). 천년 고찰 대흥사를 품고 있다." },
+  { no:75, name:"바래봉", region:"전라", loc:"전남 지리산", lat:35.359, lng:127.474, height:1165, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"운봉 코스 (9km, 약 4시간 30분)|남원 코스 (10km, 약 5시간)",
+    shortCourse:"운봉 코스 (9km, 4시간 30분)",
+    etymology:"봄에 철쭉이 만개하여 '바라보다'는 의미의 바래에서 유래. 지리산 서쪽 철쭉 군락지로 봄 산행 1번지." },
+  { no:76, name:"백암산", region:"전라", loc:"전남 장성", lat:35.472, lng:126.888, height:741, peak:"상왕봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"백양사 코스 (10km, 약 5시간)|약수봉 코스 (8km, 약 4시간)",
+    shortCourse:"약수봉 코스 (8km, 4시간)",
+    etymology:"'흰 바위가 있는 산'이라는 뜻의 백암(白岩). 백양사의 쌍계루와 비자나무 숲이 유명하다." },
+  { no:77, name:"내장산", region:"전라", loc:"전북 장성", lat:35.477, lng:126.897, height:763, peak:"신선봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"내장사 코스 (8km, 약 4시간)|벽련암 코스 (10km, 약 5시간)|신선봉 코스 (7km, 약 3시간 30분)",
+    shortCourse:"신선봉 코스 (7km, 3시간 30분)",
+    etymology:"'산속에 숨겨진 보물이 많다'는 뜻으로 내장(內藏). 우리나라 최고의 단풍 명소로 손꼽힌다." },
+  { no:78, name:"마이산", region:"전라", loc:"전북 진안", lat:35.765, lng:127.389, height:527, peak:"암마이봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"남부주차장 코스 (5km, 약 2시간 30분)|북부주차장 코스 (4km, 약 2시간)",
+    shortCourse:"북부주차장 코스 (4km, 2시간)",
+    etymology:"두 봉우리가 말의 귀를 닮아 마이산(馬耳山). 타포니 지형과 탑사의 돌탑이 독특하다." },
+  { no:79, name:"변산", region:"전라", loc:"전북 부안", lat:35.654, lng:126.626, height:424, peak:"관음봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"내소사 코스 (6km, 약 3시간)|채석강 코스 (8km, 약 4시간)",
+    shortCourse:"내소사 코스 (6km, 3시간)",
+    etymology:"서해 바다를 끼고 있는 반도의 가장자리 산이라는 뜻. 내소사와 채석강, 직소폭포가 유명하다." },
+  { no:80, name:"구봉산", region:"전라", loc:"전북 진안", lat:35.844, lng:127.397, height:1002, peak:"천황봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"주천리 코스 (9km, 약 4시간 30분)|구봉대피소 코스 (7km, 약 4시간)",
+    shortCourse:"구봉대피소 코스 (7km, 4시간)",
+    etymology:"아홉 개의 봉우리가 이어져 구봉산(九峰山). 운장산과 함께 진안의 명산이다." },
+  { no:81, name:"운장산", region:"전라", loc:"전북 진안", lat:35.880, lng:127.370, height:1122, peak:"운장대",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"대불리 코스 (10km, 약 5시간)|운일암반일암 코스 (8km, 약 4시간 30분)",
+    shortCourse:"운일암반일암 코스 (8km, 4시간 30분)",
+    etymology:"구름 위를 거니는 신선의 놀이터라는 뜻의 운장(雲長). 운일암반일암 계곡이 유명하다." },
+  { no:82, name:"장안산", region:"전라", loc:"전북 장수", lat:35.680, lng:127.594, height:1237, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"장안리 코스 (10km, 약 5시간)|덕산리 코스 (9km, 약 4시간 30분)",
+    shortCourse:"덕산리 코스 (9km, 4시간 30분)",
+    etymology:"'오래도록 편안한 산'이라는 뜻의 장안(長安). 호남의 지붕으로 알려진 장수군의 주요 산이다." },
+  { no:83, name:"모악산", region:"전라", loc:"전북 완주", lat:35.705, lng:127.106, height:793, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"금산사 코스 (7km, 약 3시간 30분)|수왕사 코스 (8km, 약 4시간)",
+    shortCourse:"금산사 코스 (7km, 3시간 30분)",
+    etymology:"'어머니(母) + 산 악(岳)'으로, 전주평야를 내려다보는 넉넉한 산세가 어머니의 품을 연상시킨다." },
+  { no:84, name:"대둔산", region:"전라", loc:"전북 완주", lat:36.131, lng:127.329, height:878, peak:"마천대",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"수락리 코스 (6km, 약 3시간 30분)|태고사 코스 (5km, 약 3시간)",
+    shortCourse:"태고사 코스 (5km, 3시간)",
+    etymology:"'크고 둥근 바위산'이라는 뜻의 대둔(大屯). 쇠줄 계단과 구름다리로 유명하며 호남의 금강이라 불린다." },
+  { no:85, name:"덕유산", region:"전라", loc:"전북 무주", lat:35.835, lng:127.741, height:1614, peak:"향적봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"무주리조트 곤돌라 (3km, 약 2시간)|구천동 코스 (15km, 약 7시간)|백련사 코스 (10km, 약 5시간)",
+    shortCourse:"곤돌라 이용 코스 (3km, 2시간)",
+    etymology:"'덕스러운 너른 산'이라는 뜻의 덕유(德裕). 겨울 눈꽃과 설경이 아름다우며 무주리조트와 인접해 있다." },
+  { no:86, name:"선운산", region:"전라", loc:"전북 고창", lat:35.617, lng:126.590, height:336, peak:"수리봉",
+    difficulty:"하중", diffClass:"diff-easy",
+    courses:"선운사 코스 (6km, 약 3시간)|도솔암 코스 (5km, 약 2시간 30분)",
+    shortCourse:"도솔암 코스 (5km, 2시간 30분)",
+    etymology:"'구름 속에 선(禪)을 닦는 산'이라는 뜻의 선운(禪雲). 봄 동백꽃과 선운사가 유명한 문화 명산이다." },
+  { no:87, name:"가야산(충남)", region:"충청", loc:"충남 서산", lat:36.669, lng:126.464, height:678, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"원천리 코스 (7km, 약 3시간 30분)|일락사 코스 (6km, 약 3시간)",
+    shortCourse:"일락사 코스 (6km, 3시간)",
+    etymology:"불교적 의미의 지명으로 충남 서산의 진산. 경남의 가야산과 동명이지만 전혀 다른 산이다." },
+  { no:88, name:"계룡산", region:"충청", loc:"충남 공주", lat:36.353, lng:127.197, height:816, peak:"관음봉",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"동학사 코스 (9km, 약 4시간 30분)|갑사 코스 (10km, 약 5시간)|신원사 코스 (8km, 약 4시간)",
+    shortCourse:"동학사 코스 (9km, 4시간 30분)",
+    etymology:"산의 형세가 용이 날아오르는 닭의 모습 같다 하여 계룡산(鷄龍山). 풍수지리의 명당으로 유명하다." },
+  { no:89, name:"광덕산", region:"충청", loc:"충남 천안", lat:36.854, lng:127.118, height:699, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"광덕사 코스 (7km, 약 3시간 30분)|홍두께재 코스 (6km, 약 3시간)",
+    shortCourse:"홍두께재 코스 (6km, 3시간)",
+    etymology:"'넓고 덕스러운 산'이라는 뜻의 광덕(廣德). 광덕사의 호두나무가 국내에서 가장 크고 유명하다." },
+  { no:90, name:"오서산", region:"충청", loc:"충남 보령", lat:36.545, lng:126.691, height:791, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"성연리 코스 (7km, 약 3시간 30분)|오서산 코스 (6km, 약 3시간)",
+    shortCourse:"오서산 코스 (6km, 3시간)",
+    etymology:"'까마귀가 서식하는 산'이라는 뜻의 오서(烏棲). 서해를 한눈에 조망하는 충남 최고의 전망 명소." },
+  { no:91, name:"용봉산", region:"충청", loc:"충남 홍성", lat:36.549, lng:126.594, height:381, peak:"정상",
+    difficulty:"하중", diffClass:"diff-easy",
+    courses:"용봉산 코스 (4km, 약 2시간 30분)|내포 코스 (5km, 약 3시간)",
+    shortCourse:"용봉산 코스 (4km, 2시간 30분)",
+    etymology:"용과 봉황이 살았다는 전설에서 용봉산(龍鳳山). 기암괴석이 독특하여 '충남의 금강'이라 불린다." },
+  { no:92, name:"칠갑산", region:"충청", loc:"충남 청양", lat:36.435, lng:126.849, height:561, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"장곡사 코스 (5km, 약 2시간 30분)|칠갑산 코스 (7km, 약 3시간 30분)",
+    shortCourse:"장곡사 코스 (5km, 2시간 30분)",
+    etymology:"일곱 개의 갑옷 같은 능선이 있다는 뜻의 칠갑(七甲). 충남의 알프스로 불리며 민요로도 유명하다." },
+  { no:93, name:"민주지산", region:"충청", loc:"충북 영동", lat:36.067, lng:127.853, height:1241, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"석기봉 코스 (12km, 약 6시간)|물한계곡 코스 (10km, 약 5시간)",
+    shortCourse:"물한계곡 코스 (10km, 5시간)",
+    etymology:"충북·전북·경북 3개 도가 만나는 지점에 있어 민주지산이라 불린다는 설이 있다." },
+  { no:94, name:"속리산", region:"충청", loc:"충북 보은", lat:36.535, lng:127.856, height:1058, peak:"천왕봉",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"법주사 코스 (11km, 약 5시간 30분)|화양동 코스 (12km, 약 6시간)|장각동 코스 (9km, 약 4시간 30분)",
+    shortCourse:"장각동 코스 (9km, 4시간 30분)",
+    etymology:"속세를 떠나 속(俗)이 없는 곳이라 하여 속리산(俗離山). 법주사와 정이품송이 유명하다." },
+  { no:95, name:"월악산", region:"충청", loc:"충북 제천", lat:36.861, lng:128.082, height:1097, peak:"영봉",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"송계리 코스 (6km, 약 4시간)|덕주사 코스 (7km, 약 4시간 30분)|미륵리 코스 (8km, 약 5시간)",
+    shortCourse:"송계리 코스 (6km, 4시간)",
+    etymology:"달이 산 위에 걸려 있는 모습에서 월악산(月岳山). 청풍호와 어우러진 경관이 아름답다." },
+  { no:96, name:"구병산", region:"충청", loc:"충북 보은", lat:36.467, lng:127.738, height:877, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"구병리 코스 (8km, 약 4시간)|화북면 코스 (7km, 약 3시간 30분)",
+    shortCourse:"화북면 코스 (7km, 3시간 30분)",
+    etymology:"아홉 봉우리가 병풍처럼 둘러서 있다 하여 구병산(九屛山)이라 불린다." },
+  { no:97, name:"천태산", region:"충청", loc:"충북 영동", lat:36.192, lng:127.659, height:714, peak:"정상",
+    difficulty:"중", diffClass:"diff-medium",
+    courses:"영국사 코스 (6km, 약 3시간)|용화리 코스 (7km, 약 3시간 30분)",
+    shortCourse:"영국사 코스 (6km, 3시간)",
+    etymology:"'하늘 아래 대(台)'라는 뜻. 천태종 불교의 성지로, 신라시대 창건된 영국사와 은행나무 군락이 유명하다." },
+  { no:98, name:"금수산", region:"충청", loc:"충북 단양", lat:36.975, lng:128.249, height:1016, peak:"정상",
+    difficulty:"중상", diffClass:"diff-medium",
+    courses:"수산리 코스 (7km, 약 3시간 30분)|적성면 코스 (8km, 약 4시간)",
+    shortCourse:"수산리 코스 (7km, 3시간 30분)",
+    etymology:"'비단처럼 아름다운 물이 흐르는 산'이라는 뜻의 금수(錦繡). 단양 8경 중 하나인 선암 코스가 있다." },
+  { no:99, name:"도락산", region:"충청", loc:"충북 단양", lat:37.001, lng:128.299, height:964, peak:"정상",
+    difficulty:"상", diffClass:"diff-hard",
+    courses:"대강면 코스 (8km, 약 4시간 30분)|방곡리 코스 (7km, 약 4시간)",
+    shortCourse:"방곡리 코스 (7km, 4시간)",
+    etymology:"도를 즐긴다는 뜻의 도락(道樂). 기암절벽과 아름다운 경관이 신선들이 노닐던 곳처럼 보인다 하여 붙여진 이름." },
+  { no:100, name:"한라산", region:"제주", loc:"제주", lat:33.362, lng:126.533, height:1950, peak:"백록담",
+    difficulty:"최상", diffClass:"diff-extreme",
+    courses:"성판악 코스 (9.6km, 약 4시간 30분)|관음사 코스 (8.7km, 약 5시간)|영실 코스 (5.8km, 정상 미허용)",
+    shortCourse:"성판악 코스 (9.6km, 4시간 30분)",
+    etymology:"은하수를 손으로 당길 수 있을 만큼 높다 하여 한라산(漢拏山). 대한민국 최고봉(1,950m)." }
+];
+
+// ── 고도별 색상
+function getColor(h) {
+  if (h >= 1500) return '#e8320a';
+  if (h >= 1000) return '#f97316';
+  if (h >= 700)  return '#eab308';
+  return '#84cc16';
+}
+
+// ── 마커 SVG
+function makeIcon(m) {
+  const c = getColor(m.height);
+  const r = Math.max(8, Math.min(14, 6 + m.height / 200));
+  retur
